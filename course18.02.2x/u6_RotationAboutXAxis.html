@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<label style="position:absolute; left:1%; font-size:32px">
+  <input type="button" onclick="button_click()" value="Stop animation"/>
+</label>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script>
+  // # Initialize scene and bounding box
+  var scene = createScene();
+  var renderer = createRenderer()
+
+  // # Initialize camera
+  var camera = createCamera();
+  camera.up.set( 0, 0, 1 );
+  camera.position.set( 2, 2, 2 );
+  scene.add( camera );
+
+  // # Lights
+  // Ambient light
+  var ambient = {"color":"#7f7f7f"};
+  scene.add( new THREE.AmbientLight( ambient.color) );
+
+  // Custom lights
+  var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+  for ( var i=0 ; i < lights.length ; i++ ) {
+      var light = new THREE.DirectionalLight( lights[i].color, 1 );
+      light.position.set( lights[i].x, lights[i].y, lights[i].z );
+      if ( lights[i].parent === 'camera' ) {
+          light.target.position.set(0, 0, 0);
+          scene.add( light.target );
+          camera.add( light );
+      } else scene.add( light );
+  }
+
+  // # Event listeners
+  var controls = new THREE.OrbitControls( camera, renderer.domElement );
+  controls.target.set(0, 0, 0);
+  function render() {
+      renderer.render( scene, camera );
+  }
+  controls.addEventListener( 'change', function() { render(); } );
+
+  
+  window.addEventListener( 'resize', function() {
+      renderer.setSize( window.innerWidth, window.innerHeight );
+      updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+      render();
+  } );
+  // Axes
+  scene.add(makeAxes());
+  var boxGeometry = new THREE.BoxGeometry(1, 1, 0.05, 1, 1, 1);
+  const basicMaterial = new THREE.MeshPhongMaterial( {color: color2, side:THREE.DoubleSide} );
+  var box = new THREE.Mesh(boxGeometry, basicMaterial);
+  var noAnimate = false;
+  update_box = function() {
+    if (noAnimate) {
+      return;
+    }
+    const positions = box.geometry.getAttribute('position').array;
+    for (let i=0; i < positions.length; i+=3) {
+      positions[i+1] += positions[i+2]/100;
+      positions[i+2] -= positions[i+1]/100;
+    }
+    box.geometry.attributes.position.needsUpdate = true; 
+    box.geometry.computeVertexNormals();
+  }
+  scene.add(box);
+  button_click = function() {
+    noAnimate = ! noAnimate;
+    if (noAnimate) {
+      $('input').attr('value','Start animation');
+      return
+    }
+    $('input').attr('value','Stop animation');
+  };
+  animate = function() {
+    requestAnimationFrame(animate);
+    update_box();
+    render();
+  };
+  animate();
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2.4, 2, 1.5 );
+    scene.add( camera );
+
+    const rstar = 0.8;
+
+    function cylindrical_to_rectangular(r, theta, z) {
+      const x = r*Math.cos(theta);
+      const y = r*Math.sin(theta);
+      return new THREE.Vector3(x,y,z);
+    }
+
+    // # Actors
+
+    function parametricLineToVectors(r, tMin, tMax, subdivisions) {
+      /*
+       *  returns a sequence of points r(t) where t runs through [tMin, tMax].
+       *  r: R to THREE.Vector3 
+       */
+      const vertices = []
+      for (var i=0; i < subdivisions+1; i++) {
+        // the plus one is because n line segments requires n+1 points
+        const t = tMin + (i*(tMax-tMin)/subdivisions);
+        vertices.push(r(t));
+      }
+      return vertices;
+    }
+
+    function cylinder_latitude(r, z) {
+      function r2(t) {
+        return cylindrical_to_rectangular(r, t, z);
+      }
+      return r2;
+    }
+    function cylinder_longitude(r, theta) {
+      function r2(t) {
+        return cylindrical_to_rectangular(r, theta, t);
+      }
+      return r2;
+    }
+
+    function quick_line_from_vectors(listVectors, {color=new THREE.Color(0xf00000),material=false}={}) {
+      if (material == false) {
+        material = new MeshLineMaterial({color: color, lineWidth:0.01});
+      }
+      var points = []
+      listVectors.forEach(v => {
+        points.push(v.x);
+        points.push(v.y);
+        points.push(v.z);
+      });
+      const l0 = new MeshLine();
+      l0.setPoints(points); 
+      scene.add(new THREE.Mesh( l0, material));
+    }
+
+    // colors
+    const zColor = new THREE.Color('#5773dc');
+    const rColor =  new THREE.Color('#f78139');
+    const thetaColor = new THREE.Color('#293b81');
+
+    // arc for delta theta label
+    quick_line_from_vectors(
+      parametricLineToVectors(cylinder_latitude(0.3, 0), 0, Math.PI/6, 10),
+      {color: new THREE.Color(thetaColor)}
+    );
+    // line from origin to delta theta
+    quick_line_from_vectors(
+      [cylindrical_to_rectangular(rstar, Math.PI/6, 0), new THREE.Vector3(0,0,0)], 
+      {color:new THREE.Color(thetaColor)}
+    );
+    // line showing length of r
+    const maxZ = 0.9;
+    const deltaZ = maxZ/4;
+    quick_line_from_vectors(
+      [cylindrical_to_rectangular(rstar, 0, 3*deltaZ), new THREE.Vector3(0,0,3*deltaZ)],
+      {color:'black'}
+    );
+
+    // Text labels
+
+    const thetaLabelPos = cylindrical_to_rectangular(0.5, Math.PI/12, 0); 
+
+    addLabel( '\u0394' + '\u03B8', thetaLabelPos.x, thetaLabelPos.y, thetaLabelPos.z, thetaColor, 'monospace', 0.5);
+
+    const latitudeLengthLabelPos = cylindrical_to_rectangular(rstar*1.2, Math.PI/6*1.5, 3.3*deltaZ);
+    const longitudeLengthLabelPos = cylindrical_to_rectangular(rstar*1.2, Math.PI/6*2.25, 2.5*deltaZ);
+    const thickLengthLabelPos = cylindrical_to_rectangular(rstar*1.05, Math.PI/6*0.8, 1.9*deltaZ); 
+
+    const rLabelPos = cylindrical_to_rectangular(rstar*0.9, 0, 3.3*deltaZ);
+
+    addLabel( 'r' + '\u0394' + '\u03B8', latitudeLengthLabelPos.x, latitudeLengthLabelPos.y, latitudeLengthLabelPos.z, 'black', 'monospace', 0.4);
+    addLabel( '\u0394' + 'z', longitudeLengthLabelPos.x, longitudeLengthLabelPos.y, longitudeLengthLabelPos.z, 'black', 'monospace', 0.4);
+    addLabel( '\u0394' + 'r', thickLengthLabelPos.x, thickLengthLabelPos.y, thickLengthLabelPos.z, rColor, 'monospace', 0.4);
+    addLabel( 'r', rLabelPos.x, rLabelPos.y, rLabelPos.z, 'black', 'monospace', 0.4);
+
+    // cylinder grid
+    for (let p=0; p <= maxZ; p += deltaZ) {
+      quick_line_from_vectors(
+        parametricLineToVectors(cylinder_latitude(rstar,p), 0, Math.PI/2, 40),
+        {color: new THREE.Color('gray')}
+      );
+    }
+    for (let t=0; t <= Math.PI/2; t += Math.PI/6) {
+      quick_line_from_vectors(
+        [
+          cylindrical_to_rectangular(rstar, t, 0),
+          cylindrical_to_rectangular(rstar, t, maxZ),
+        ],
+        {color: new THREE.Color('gray')}
+      );
+    }
+
+    // arcs around patch
+    quick_line_from_vectors(
+      parametricLineToVectors(cylinder_latitude(rstar*1.105, 3*deltaZ), Math.PI/6, 2*Math.PI/6+0.005, 40),
+      {color: new THREE.Color('black')}
+    );
+    quick_line_from_vectors(
+      parametricLineToVectors(cylinder_longitude(rstar*1.105,Math.PI/6*2), 2*deltaZ, 3*deltaZ, 2),
+      {color: new THREE.Color('black')}
+    );
+
+    // line lower left corner of piece
+    quick_line_from_vectors(
+      [
+        cylindrical_to_rectangular(rstar*1.1, Math.PI/6*0.990, 2*deltaZ), 
+        cylindrical_to_rectangular(rstar*1.0, Math.PI/6*0.990, 2*deltaZ),
+      ], 
+      {color:new THREE.Color(rColor)}
+    );
+
+    // Helper functions
+    const save_original_position = function(g) {
+      g.setAttribute(
+        'original_position',
+        new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').array), 3, true)
+      )
+    };
+    const apply_map_to_positions = function(f, g) {
+      // f(x,y,z) is a vector3
+      const orig_position = g.getAttribute('original_position').array;
+      const positions = g.getAttribute('position').array;
+      for (let i=0; i < positions.length; i+=3) {
+        t = f(orig_position[i], orig_position[i+1],orig_position[i+2]);
+        positions[i+0] = t.x;
+        positions[i+1] = t.y;
+        positions[i+2] = t.z;
+      }
+      g.attributes.position.needsUpdate = true; 
+
+    };
+
+    const cylinderPiece_geometry = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
+
+    save_original_position(cylinderPiece_geometry);
+    const box_to_cylinderPiece = function(x,y,z){
+      x += 0.5;
+      y += 0.5;
+      z += 0.5;
+      return cylindrical_to_rectangular((1-x)*(rstar) + x*(1.1*rstar), (1-y)*Math.PI/6*1 + y*Math.PI/6*2, (1-z)*deltaZ*2 + z*deltaZ*3);
+    };
+    apply_map_to_positions(box_to_cylinderPiece, cylinderPiece_geometry);
+    cylinderPiece_geometry.computeVertexNormals();
+    const cylinderPiece_material = new THREE.MeshLambertMaterial( {color:color1, side:THREE.DoubleSide, transparent: false} );
+    const cylinderPiece_mesh = new THREE.Mesh(cylinderPiece_geometry, cylinderPiece_material);
+    scene.add(cylinderPiece_mesh);
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    const pointLight = new THREE.PointLight( 0xffffff, 0.5);
+    pointLight.position.set(0, 0, 0); 
+    camera.add(pointLight);
+
+    scene.add(new THREE.PointLightHelper(pointLight, 0.1));
+
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+    autoRotate_until_clicked(controls, render);
+</script>
+
+
+</body>
+</html>

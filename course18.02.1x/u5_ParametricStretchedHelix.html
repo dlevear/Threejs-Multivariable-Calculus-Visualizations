@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+    /* # OVERLAY STYLE */
+    /* Don't put these in a stylesheet, they might not load before the javascript, defeating the purpose */
+    .overlay {
+        position:absolute;
+        text-align:center;
+        left:0;
+        top:0;
+        width:100%;
+        height:100%;
+        z-index:99;
+        display:block;
+        pointer-events:none; /* so any clicks on overlays get passed to the underlying canvas */
+    }
+    #overlay1 {
+        background-color: rgba(127, 127, 127, 1);
+        z-index:100;
+    }
+    #overlay2 {
+        cursor:pointer;
+        background-color: rgba(127, 127, 127, .5);
+        z-index:99;
+    }
+    .overlayText {
+        font-size:500%;
+        opacity:1;
+        font-family:Georgia;
+        position:absolute;
+        top:50%;
+        transform: translate(-50%,-50%);
+    }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<div class="overlay" id="overlay1">
+  <span id="overlay1Text" class="overlayText">
+    Loading 3D...
+  </span>
+</div>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script src="threejs_overlayEvents.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createOrthographicCameraDynamically();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 3, 3, 3 );
+    scene.add( camera );
+
+    // # Actors
+    // Scene: Helix, labelled starting point, arrow at the end, and axes
+
+    // Make the helix
+    var line = new MeshLine();
+    points = []
+    for (var t=0; t < 8*Math.PI; t += 0.1) {
+      points.push(Math.cos(t))
+      points.push(Math.sin(t))
+      points.push(t*t/350)
+    }
+    line.setPoints(points);
+    
+    var material = new MeshLineMaterial({color: new THREE.Color( 0x0000ff), lineWidth: 0.02});
+    var mesh = new THREE.Mesh(line, material);
+    scene.add(mesh);
+
+    // Make the arrow at the end
+    const endPt = points.slice(-3);
+    const endPtVector = new THREE.Vector3(endPt[0],endPt[1],endPt[2]);
+    const penultimatePt = points.slice(-3*2,-3);
+    const finalVector = new THREE.Vector3(endPt[0]-penultimatePt[0], endPt[1]-penultimatePt[1], endPt[2]-penultimatePt[2]);
+    finalVector.normalize();
+    finalVector.multiplyScalar(.10);
+    v = drawVector(finalVector, {origin:endPtVector, thickness:0.010, color:'blue', headHeight: .04});
+    scene.add(v);
+
+    // Sphere for starting point
+    const basePt = new THREE.Vector3(Math.cos(0), Math.sin(0), 0);
+    const sphereGeometry = new THREE.SphereGeometry(.02, 12, 12);
+    sphereGeometry.translate(basePt.x, basePt.y, basePt.z);
+    const sphereMaterial = new THREE.MeshBasicMaterial({color:'black'});
+    const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    scene.add(sphereMesh);
+
+    // Text for starting point
+    let kickOut = new THREE.Vector3(0, 0, -.15);
+    kickOut.add(basePt);
+    text = `(${basePt.x}, ${basePt.y}, ${basePt.z})`
+    addLabel(text, kickOut.x, kickOut.y, kickOut.z, 'black', 'monospace', .75);
+    
+
+    // Axes
+    scene.add(makeAxes({xMax:2, yMax:2, zMax:2}));
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, .7);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Document loaded
+    $( document ).ready(function() {
+      // # Display first time
+      overlaySetup();
+      render();
+      controls.update();
+      autoRotate_until_clicked(controls, render);
+    });
+</script>
+
+
+</body>
+</html>

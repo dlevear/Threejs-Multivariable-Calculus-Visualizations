@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<div style="position:absolute; top:0px; left:1%; width:30%; font-family:Georgia">
+  <table style="width:100%">
+  <tbody>
+  <tr><td>&#x03C1;=</td><td style="width:30px"><span style="display:inline-block; min-width:40px" id="rhoValue">0.80</span></td> <td><input style="width:80%" type="range" min="1" max="500" value="400" class="slider" id="rhoSlider"><span>1</span></td></tr> 
+  <tr><td>&#x03B8;=</td><td style="width:30px"><span style="display:inline-block; min-width:40px" id="thetaValue">&#x03C0;/4</span></td> <td><input style="width:80%" type="range" min="1" max="500" value="63" class="slider" id="thetaSlider"><span>2&#x03C0;</span></td></tr> 
+  <tr><td>&#x03C6;=</td><td style="width:30px"><span style="display:inline-block; min-width:40px" id="phiValue">&#x03C0;/4</span></td> <td><input style="width:80%" type="range" min="1" max="500" value="126" class="slider" id="phiSlider"><span>&#x03C0;</span></td></tr> 
+  </tbody>
+  </table>
+</div>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script>
+    function text_box(text, x, y, z, {color='black',font='monospace',size=1}={}) {
+      /*
+       *  Enhanced version of addLabel(). Returns the sprite.
+      */
+        var canvas = document.createElement( 'canvas' ); 
+        canvas.width = 256;
+        canvas.height = 256;
+        var context = canvas.getContext( '2d' );
+        c = new THREE.Color(color);
+        color = c.getStyle();
+    
+        context.font = 'italic 64px Georgia';
+        context.fillStyle = color;
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText( text, canvas.width/2, canvas.height/2);
+    
+        var texture = new THREE.Texture( canvas );
+        texture.needsUpdate = true;
+    
+        var sprite = new THREE.Sprite( new THREE.SpriteMaterial( { map: texture, color: 0xffffff } ) );
+        sprite.position.set( x, y, z );
+    
+        sprite.scale.set(size,size,size); 
+    
+        scene.add( sprite );
+    
+        return sprite;
+    }
+
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2, 2, 2 );
+    scene.add( camera );
+
+    function spherical_to_rectangular(rho, theta, phi) {
+      const r = rho*Math.sin(phi);
+      const z = rho*Math.cos(phi);
+      const x = r*Math.cos(theta);
+      const y = r*Math.sin(theta);
+      return new THREE.Vector3(x,y,z);
+    }
+
+    function parametricLineToVectors(r, tMin, tMax, subdivisions) {
+      /*
+       *  returns a sequence of points r(t) where t runs through [tMin, tMax].
+       *  r: R to THREE.Vector3 
+       */
+      const vertices = []
+      for (var i=0; i < subdivisions+1; i++) {
+        // the plus one is because n line segments requires n+1 points
+        const t = tMin + (i*(tMax-tMin)/subdivisions);
+        vertices.push(r(t));
+      }
+      return vertices;
+    }
+    function quick_line_from_vectors(listVectors, {color=new THREE.Color(0xf00000),material=false}={}) {
+      if (material == false) {
+        material = new MeshLineMaterial({color: color, lineWidth:0.02});
+      }
+      var points = []
+      listVectors.forEach(v => {
+        points.push(v.x);
+        points.push(v.y);
+        points.push(v.z);
+      });
+      const l0 = new MeshLine();
+      l0.setPoints(points); 
+      const mesh = new THREE.Mesh( l0, material);
+      scene.add(mesh);
+      return mesh;
+    }
+    function get_slider_value_scaled(id) {
+      var v = $(id).val();
+      var minV = $(id).attr('min');
+      var maxV = $(id).attr('max');
+      return (v-minV)/maxV;
+    }
+
+    // # Actors
+    // Stored in an object so they can be updated
+    const actors = {
+      point: undefined,
+      rholine: undefined,
+      shadowline: undefined,
+      planeline: undefined, 
+      zaxisline: undefined,
+      zaxislineshadow: undefined,
+      phiArc: undefined,
+      thetaArc: undefined,
+      thetalabel: undefined,
+      philabel: undefined,
+      rholabel: undefined,
+    };
+    function update_actors(rhostar, thetastar, phistar) {
+      Object.values(actors).forEach(a => scene.remove(a));
+      const rstar = rhostar*Math.sin(phistar);
+      const tinyPoint = new THREE.SphereGeometry(0.02, 8, 8, 0, 2*Math.PI);
+      const xyzstar = spherical_to_rectangular(rhostar,thetastar,phistar);
+      tinyPoint.translate(xyzstar.x, xyzstar.y, xyzstar.z);
+      actors.point = new THREE.Mesh(tinyPoint, new THREE.MeshLambertMaterial({color: 'black'}));
+
+      function theta_arc(t) {
+        return spherical_to_rectangular(rhostar/3, thetastar*t, Math.PI/2); 
+      }
+      function phi_arc(t) {
+        return spherical_to_rectangular(rhostar/3, thetastar, phistar*t); 
+      }
+
+      // colors
+      const phiColor = new THREE.Color('#5773dc');
+      const rhoColor =  new THREE.Color('#f78139');
+      const thetaColor = new THREE.Color('#293b81');
+
+      // arcs
+      actors.thetaArc = quick_line_from_vectors(
+        parametricLineToVectors(theta_arc, 0, 1, 40),
+        {color: thetaColor}
+      );
+      actors.phiArc = quick_line_from_vectors(
+        parametricLineToVectors(phi_arc, 0, 1, 20),
+        {color: phiColor}
+      );
+
+      // line from origin to P
+      actors.rholine = quick_line_from_vectors(
+        [xyzstar, new THREE.Vector3(0,0,0)], 
+        {color: rhoColor}
+      );
+      // line from P to z axis
+      actors.zaxisline = quick_line_from_vectors(
+        [xyzstar, new THREE.Vector3(-.0070,-0.0070,xyzstar.z)], 
+        {color:new THREE.Color('gray')}
+      );
+      // line from z axis projection to origin
+      actors.zaxislineshadow = quick_line_from_vectors(
+        [new THREE.Vector3(0,0,xyzstar.z), new THREE.Vector3(0,0,0)], 
+        {color:new THREE.Color('gray')}
+      );
+      // line from P to xy plane
+      actors.shadowline = quick_line_from_vectors(
+        [xyzstar, new THREE.Vector3(xyzstar.x,xyzstar.y,0)], 
+        {color:new THREE.Color('gray')}
+      );
+      // line from P's xy plane shadow to origin
+      // kick out radius to avoid corner
+      const kicked_rstar = rstar + 0.01;
+      const kickedX = kicked_rstar*Math.cos(thetastar);
+      const kickedY = kicked_rstar*Math.sin(thetastar);
+      const kickShadow = 0.0080; //based on meshline line width
+      actors.planeline = quick_line_from_vectors(
+        [new THREE.Vector3(kickedX, kickedY, 0), new THREE.Vector3(0,0,0)],
+        {color:new THREE.Color('gray')}
+      );
+
+      const thetaLabelPos = spherical_to_rectangular(rhostar*1/2, thetastar/2, Math.PI/2); 
+      const phiLabelPos = spherical_to_rectangular(rhostar*1/2, thetastar, phistar/2); 
+      const rhoLabelPos = spherical_to_rectangular(rhostar*3/4, thetastar, phistar-0.15); 
+      actors.thetalabel = text_box( '\u03B8', thetaLabelPos.x, thetaLabelPos.y, thetaLabelPos.z, {color: thetaColor, size:0.5}); 
+      actors.philabel = text_box( '\u03C6', phiLabelPos.x, phiLabelPos.y, phiLabelPos.z, {color:phiColor, size:0.5}); 
+      actors.rholabel = text_box( '\u03C1', rhoLabelPos.x, rhoLabelPos.y, rhoLabelPos.z, {color:rhoColor, size:0.5});
+      Object.values(actors).forEach(a => scene.add(a));
+    }
+    function number_to_string_or_pi(n, closeness, prec) {
+      if (Math.abs(n - Math.PI/2) < closeness) {
+        return '&#x03C0;/2';
+      }
+      if (Math.abs(n - Math.PI/4) < closeness) {
+        return '&#x03C0;/4';
+      }
+      if (Math.abs(n - Math.PI) < closeness) {
+        return '&#x03C0;';
+      }
+      if (Math.abs(n - 3*Math.PI/4) < closeness) {
+        return '3&#x03C0;/4';
+      }
+      if (Math.abs(n - 5*Math.PI/4) < closeness) {
+        return '5&#x03C0;/4';
+      }
+      if (Math.abs(n - 3*Math.PI/2) < closeness) {
+        return '3&#x03C0;/2';
+      }
+      if (Math.abs(n - 7*Math.PI/4) < closeness) {
+        return '7&#x03C0;/4';
+      }
+      if (Math.abs(n - 2*Math.PI) < closeness) {
+        return '2&#x03C0;';
+      }
+      return n.toFixed(prec);
+
+    };
+    function update() {
+      const rhostar = get_slider_value_scaled('#rhoSlider')*1;
+      $('#rhoValue').html(rhostar.toFixed(2)); 
+      const thetastar = get_slider_value_scaled('#thetaSlider')*2*Math.PI;
+      $('#thetaValue').html(number_to_string_or_pi(thetastar,0.15,2)); 
+      const phistar = get_slider_value_scaled('#phiSlider')*Math.PI;
+      $('#phiValue').html(number_to_string_or_pi(phistar,0.075,2)); 
+      update_actors(rhostar, thetastar, phistar);
+    }
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+    $("#rhoSlider").on('input', function() {
+      update();
+      render();
+    });
+    $("#thetaSlider").on('input', function() {
+      update();
+      render();
+    });
+    $("#phiSlider").on('input', function() {
+      update();
+      render();
+    });
+
+    // # Display first time
+    update();
+    render();
+    controls.update();
+    autoRotate_until_clicked(controls, render);
+</script>
+
+
+</body>
+</html>

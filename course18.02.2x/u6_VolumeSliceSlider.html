@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<input style="position:absolute; top:0px; left:40%; width:20%" type="range" min="1" max="500" value="300" class="slider" id="xSlider">
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script>
+    // Helper functions
+    const save_original_position = function(g) {
+      g.setAttribute(
+        'original_position',
+        new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').array), 3, true)
+      )
+    };
+    const apply_map_to_positions = function(f, g) {
+      // f(x,y,z) is a vector3
+      const orig_position = g.getAttribute('original_position').array;
+      const positions = g.getAttribute('position').array;
+      for (let i=0; i < positions.length; i+=3) {
+        t = f(orig_position[i], orig_position[i+1],orig_position[i+2]);
+        positions[i+0] = t.x;
+        positions[i+1] = t.y;
+        positions[i+2] = t.z;
+      }
+      g.attributes.position.needsUpdate = true; 
+
+    };
+
+    // # Initialize scene and bounding box
+    const scene = createScene();
+    const renderer = createRenderer()
+
+    // # Initialize camera
+    const camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2.5, 2.5, 2.5 );
+    scene.add( camera );
+
+    // # Actors
+    // Scene: surface with volume-so-far 
+
+    // Axes
+    scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
+
+    // Wireframe of paraboloid
+    const graphingFunction = function(x,y) {
+      return 0.5*Math.sin(2*y+1)*Math.cos(3*x+1)+0.75;
+    }
+    //Changing graphingFunction requires manually changing endpoints for pos/neg areas
+    const paraboloid = function (a, b, target) {
+        const x = a;
+        const y = b;
+        const z = graphingFunction(x,y);
+        target.set(x,y,z);
+        return new THREE.Vector3(x, y, z); 
+    }
+    const paraboloidGeometry = new THREE.ParametricGeometry(paraboloid, 16, 16);
+    const paraboloidMaterial = new THREE.MeshPhongMaterial( {color: 'black', side:THREE.DoubleSide, transparent: true } );
+    const paraboloidMesh = new THREE.Mesh(paraboloidGeometry, paraboloidMaterial);
+    scene.add(paraboloidMesh);
+
+    // "wireframe texture"
+    var loader = new THREE.TextureLoader()
+    loader.load(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABAAQAAAACCEkxzAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAd2KE6QAAAAHdElNRQflDA8XHhYuMuK9AAAAGUlEQVQoz2P4DwUMDQxgwDjKGGUQZsCSDQCEwi8vHK/McQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQyMzozMDowMCswMDowMDLe57IAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMjM6Mjk6NTUrMDA6MDBkwIrHAAAAAElFTkSuQmCC',
+      function(texture) {
+        // function called when load is complete
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(20, 20);
+        paraboloidMaterial.alphaMap = texture;
+
+        // next two lines signal an asynchronous update
+        paraboloidMaterial.needsUpdate = true;
+        requestAnimationFrame(render);
+      }
+    );
+
+    // Square region in xy-plane
+    const ringGeometry = new THREE.RingGeometry(0.7, 0.80, 4);
+    ringGeometry.rotateZ(Math.PI/4);
+    const ringMaterial = new THREE.MeshBasicMaterial({opacity:0.5, color:'#550000', side:THREE.DoubleSide});
+    const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+    ringMesh.position.set(0.5, 0.5, 0.001);
+    scene.add(ringMesh);
+
+    // Square around current slice parallel to yz-plane
+    const frameGeometry = new THREE.RingGeometry(1.25, 1.35, 4);
+    const frameMaterial = new THREE.MeshBasicMaterial({color:color1, side:THREE.DoubleSide});
+    const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+    frameMesh.rotateY(Math.PI/2);
+    frameMesh.rotateZ(Math.PI/4);
+    frameMesh.position.set(0.5, 1, 0.25);
+    scene.add(frameMesh);
+
+    const update_frame = function(xSliderValue) {
+      frameMesh.position.set(xSliderValue+0.002, 0.5, 0.25);
+    };
+
+    // Positive Area
+    const positiveVolumeGeometry = new THREE.BoxGeometry(1, 1, 1, 16, 16, 16);
+    const positiveVolumeMaterial = new THREE.MeshPhongMaterial( {color: color2, side:THREE.DoubleSide} );
+    const positiveVolumeMesh = new THREE.Mesh(positiveVolumeGeometry, positiveVolumeMaterial);
+    save_original_position(positiveVolumeGeometry);
+    const update_positiveVolume = function(xSlider) {
+      // Update function for positive chunk only going up to given x value
+      const box_to_paraboloid = function(x,y,z){
+        ret = new THREE.Vector3(0,0,0);
+        ret.x = (x+0.5)*xSlider;
+        ret.y = (y+0.5);
+        ret.z = (graphingFunction(ret.x,ret.y)*(z+0.5))*0.990; 
+        return ret;
+      };
+      apply_map_to_positions(box_to_paraboloid, positiveVolumeGeometry);
+      positiveVolumeGeometry.attributes.position.needsUpdate = true; 
+    };
+    scene.add(positiveVolumeMesh);
+
+    // Face of positive volume so far (implemented as image of a square)
+    const positiveFaceGeometry = new THREE.PlaneGeometry(1, 1, 16, 16);
+    const positiveFaceMaterial = new THREE.MeshBasicMaterial({color: 'orange', side:THREE.DoubleSide});
+    const positiveFaceMesh = new THREE.Mesh(positiveFaceGeometry, positiveFaceMaterial);
+    scene.add(positiveFaceMesh);
+    save_original_position(positiveFaceGeometry);
+
+    const update_positiveFace = function(xSlider) {
+      // Update function for face draws it in new position at given x value
+      const mappingFunction = function(u,v,w) {
+        //u goes from -.5 to .5
+        //v goes from -.5 to .5
+        //w is constantly 0
+        const x = xSlider+0.001; 
+        const y = (u+0.5);
+        const z = (v+0.5)*graphingFunction(x,y)-0.01;
+        return new THREE.Vector3(x,y,z);
+      }
+      apply_map_to_positions(mappingFunction,positiveFaceGeometry);
+      positiveFaceGeometry.needsUpdate = true;
+    };
+
+
+    const update = function() {
+      xSliderValue = get_slider_value_scaled();
+      update_positiveVolume(xSliderValue);
+      update_frame(xSliderValue);
+      update_positiveFace(xSliderValue);
+    }
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color) );
+
+    // Custom lights
+    var lights = [{"x":-1, "y":-1, "z":-1, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0.5, 0.5, 0.5);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    const get_slider_value_scaled = function() {
+      var v = $("#xSlider").val();
+      var minV = $("#xSlider").attr('min');
+      var maxV = $("#xSlider").attr('max');
+      return (v-minV)/maxV;
+    }
+    $("#xSlider").on('input', function() {
+      update();
+      render();
+    });
+    update();
+
+</script>
+
+
+</body>
+</html>

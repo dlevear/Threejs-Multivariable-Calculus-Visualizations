@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<label style="position:absolute; left:1%; font-size:32px">
+  <input type="checkbox" onchange="update()" />
+  Enable temperature gradient
+  <span style="font-size:60%; font-weight:bold">0</span>
+  <style>
+    .parulaBackground {
+      background: linear-gradient(
+        to right,
+        rgb(62, 38, 168) 0%,
+        rgb(63, 40, 176) 1%,
+        rgb(64, 43, 182) 2%,
+        rgb(65, 45, 189) 3%,
+        rgb(66, 47, 192) 4%,
+        rgb(67, 49, 199) 5%,
+        rgb(68, 51, 205) 6%,
+        rgb(69, 54, 211) 7%,
+        rgb(70, 57, 217) 8%,
+        rgb(70, 60, 222) 9%,
+        rgb(71, 63, 226) 10%,
+        rgb(71, 64, 228) 11%,
+        rgb(71, 68, 232) 12%,
+        rgb(72, 71, 235) 13%,
+        rgb(72, 74, 238) 14%,
+        rgb(72, 78, 241) 15%,
+        rgb(72, 81, 243) 16%,
+        rgb(72, 83, 245) 17%,
+        rgb(71, 86, 247) 18%,
+        rgb(71, 89, 249) 19%,
+        rgb(71, 93, 250) 20%,
+        rgb(70, 96, 252) 21%,
+        rgb(69, 99, 253) 22%,
+        rgb(67, 103, 253) 23%,
+        rgb(67, 105, 254) 24%,
+        rgb(65, 108, 254) 25%,
+        rgb(62, 112, 255) 26%,
+        rgb(58, 115, 255) 27%,
+        rgb(55, 119, 254) 28%,
+        rgb(51, 123, 253) 29%,
+        rgb(48, 126, 251) 30%,
+        rgb(47, 128, 251) 31%,
+        rgb(46, 131, 249) 32%,
+        rgb(46, 134, 247) 33%,
+        rgb(45, 137, 245) 34%,
+        rgb(45, 140, 243) 35%,
+        rgb(44, 144, 240) 36%,
+        rgb(43, 145, 239) 37%,
+        rgb(41, 148, 237) 38%,
+        rgb(39, 151, 235) 39%,
+        rgb(38, 154, 233) 40%,
+        rgb(37, 157, 231) 41%,
+        rgb(36, 159, 229) 42%,
+        rgb(34, 162, 228) 43%,
+        rgb(33, 163, 227) 44%,
+        rgb(31, 166, 226) 45%,
+        rgb(29, 169, 224) 46%,
+        rgb(27, 171, 222) 47%,
+        rgb(24, 174, 219) 48%,
+        rgb(20, 176, 216) 49%,
+        rgb(15, 178, 213) 50%,
+        rgb(12, 179, 211) 51%,
+        rgb(6, 181, 207) 52%,
+        rgb(2, 183, 204) 53%,
+        rgb(0, 185, 200) 54%,
+        rgb(1, 186, 196) 55%,
+        rgb(5, 188, 192) 56%,
+        rgb(8, 188, 190) 57%,
+        rgb(16, 190, 186) 58%,
+        rgb(24, 191, 182) 59%,
+        rgb(31, 192, 178) 60%,
+        rgb(37, 194, 174) 61%,
+        rgb(42, 195, 169) 62%,
+        rgb(46, 196, 165) 63%,
+        rgb(47, 197, 163) 64%,
+        rgb(50, 198, 158) 65%,
+        rgb(54, 199, 153) 66%,
+        rgb(57, 201, 148) 67%,
+        rgb(62, 202, 143) 68%,
+        rgb(68, 203, 137) 69%,
+        rgb(75, 203, 131) 70%,
+        rgb(79, 204, 128) 71%,
+        rgb(87, 204, 122) 72%,
+        rgb(94, 205, 116) 73%,
+        rgb(102, 205, 109) 74%,
+        rgb(110, 205, 103) 75%,
+        rgb(118, 204, 96) 76%,
+        rgb(123, 204, 93) 77%,
+        rgb(132, 204, 87) 78%,
+        rgb(140, 203, 80) 79%,
+        rgb(148, 202, 74) 80%,
+        rgb(157, 201, 67) 81%,
+        rgb(165, 200, 61) 82%,
+        rgb(173, 198, 56) 83%,
+        rgb(177, 198, 53) 84%,
+        rgb(185, 196, 49) 85%,
+        rgb(192, 195, 44) 86%,
+        rgb(199, 193, 41) 87%,
+        rgb(206, 192, 39) 88%,
+        rgb(213, 190, 39) 89%,
+        rgb(219, 189, 41) 90%,
+        rgb(223, 188, 41) 91%,
+        rgb(229, 187, 44) 92%,
+        rgb(234, 186, 48) 93%,
+        rgb(239, 186, 53) 94%,
+        rgb(244, 186, 58) 95%,
+        rgb(249, 186, 62) 96%,
+        rgb(251, 187, 62) 97%,
+        rgb(254, 190, 60) 98%,
+        rgb(254, 193, 58) 99%,
+        rgb(254, 197, 55) 100%
+      );
+    }
+  </style>
+  <div class="parulaBackground" style="width:100px;display:inline-block;">&nbsp; </div>
+  <span style="font-size:60%; font-weight:bold">100</span>
+</label>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_parulaMap.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script>
+    // Helper functions
+    const save_original_position = function(g) {
+      g.setAttribute(
+        'original_position',
+        new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').array), 3, true)
+      )
+    };
+    const apply_map_to_positions = function(f, g) {
+      // f(x,y,z) is a vector3
+      const orig_position = g.getAttribute('original_position').array;
+      const positions = g.getAttribute('position').array;
+      for (let i=0; i < positions.length; i+=3) {
+        t = f(orig_position[i], orig_position[i+1],orig_position[i+2]);
+        positions[i+0] = t.x;
+        positions[i+1] = t.y;
+        positions[i+2] = t.z;
+      }
+      g.attributes.position.needsUpdate = true; 
+
+    };
+
+    // # Initialize scene
+    const scene = createScene();
+    const renderer = createRenderer()
+
+    // # Initialize camera
+    const camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set(3.39, -0.42, 1.74); 
+    scene.add( camera );
+
+    // # Actors
+    // Scene: metal plate with temperature labels optional coloring 
+    // The metal plate is stated to be [0,3] x [0,9] but is
+    // actually [0,0.4] x [0,1.2]
+    // The temperature function is stated to be x^2 + y^2 but is
+    // actually (x*/0.4*3)^2 + (y/1.2*9)^2
+    // The height function is a constant 
+    const xMin = 0;
+    const xMax = 0.4;
+    const yMin = 0;
+    const yMax = 1.2;
+    const plateTemperature = function(x,y) {
+      const scaledX = x/(xMax-xMin)*3;
+      const scaledY = y/(yMax-yMin)*9;
+      return scaledX*scaledX + scaledY*scaledY; 
+    }
+    const plateHeight = function(x,y) {
+      return 1/30; 
+    }
+
+    // Axes
+    scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
+
+    const metal_geometry = new THREE.BoxGeometry(1, 1, 1, 16, 16, 16);
+
+    save_original_position(metal_geometry);
+    const box_to_metalSheet = function(x,y,z){
+      ret = new THREE.Vector3(0,0,0);
+      ret.x = (x+0.5)*0.4; 
+      ret.y = (y+0.5)*1.2; 
+      ret.z = (plateHeight(ret.x,ret.y)*(z+0.5))*0.993;
+      return ret;
+    };
+    apply_map_to_positions(box_to_metalSheet, metal_geometry);
+    metal_geometry.computeVertexNormals();
+
+    const samplePointsScaled = [
+      new THREE.Vector2(1,0),
+      new THREE.Vector2(1,2),
+      new THREE.Vector2(1,4),
+      new THREE.Vector2(3,5),
+      new THREE.Vector2(3,7),
+      new THREE.Vector2(3,9)
+    ];
+    samplePointsScaled.forEach( v => {
+      const x = v.x*(xMax-xMin)/3;
+      const y = v.y*(yMax-yMin)/9;
+      const temp = plateTemperature(x,y);
+      const zMin = plateHeight(x,y)-1/100; 
+      const zMax = plateHeight(x,y)+3/20;
+      const textHeight = zMax + 1/10;
+      addLabel(temp.toFixed(0) + '\u00B0', x, y, textHeight, color='black', font='monospace', size=0.5 );
+      const cylinderGeometry = new THREE.CylinderGeometry(0.01, 0.01, zMax-zMin); 
+      cylinderGeometry.rotateX(Math.PI/2);
+      cylinderGeometry.translate(Math.max(0,x-0.01), Math.max(0,y-0.01), (zMax-zMin)/2+zMin); 
+      const cylinderMaterial = new THREE.MeshPhongMaterial( {color:0x000000});
+      const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+      scene.add(cylinderMesh);
+    });
+    // Add color map
+    let ps = metal_geometry.attributes.position.array;
+    let vertexColors = [];
+    for (let i=0; i < ps.length; i+=3) {
+        const x = ps[i]*3/0.4;
+        const y = ps[i+1]*9/1.2;
+        const z = ps[i+2];
+        const t = (x*x + y*y)/(100);
+        const color = parulaColorMap(t);
+        vertexColors.push(color.r); 
+        vertexColors.push(color.g); 
+        vertexColors.push(color.b); 
+    }
+    metal_geometry.setAttribute(
+        'color',
+        new THREE.BufferAttribute(new Float32Array(vertexColors),3, true)
+    );
+    metal_geometry.attributes.position.needsUpdate = true; 
+    const metal_material_gray = new THREE.MeshPhongMaterial( {color:color1, side:THREE.DoubleSide} );
+    const metal_material_color = new THREE.MeshPhongMaterial( {color:'white', vertexColors: THREE.VertexColors, side:THREE.DoubleSide} );
+    var loader = new THREE.TextureLoader()
+    loader.load(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAVElEQVRo3u3RAREAMAwCMTr/nlsd3PIKyJGUN0l2t3X9zGt/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgB0B9B1PXA3yVG5HyAAAAAElFTkSuQmCC',
+      function(texture) {
+        // function called when load is complete
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(3, 9);
+        metal_material_gray.map = texture;
+        metal_material_color.map = texture;
+
+        // next two lines signal an asynchronous update
+        metal_material_gray.needsUpdate = true;
+        metal_material_color.needsUpdate = true;
+        requestAnimationFrame(render);
+      }
+    );
+
+    const metal_mesh = new THREE.Mesh(metal_geometry, metal_material_gray);
+    
+    scene.add(metal_mesh);
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color) );
+
+    // Custom lights
+    var lights = [{"x":-1, "y":-1, "z":-1, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0.5, 0.5, 0.5);
+    controls.update()
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+    render();
+
+    const update = function() {
+      if (metal_mesh.material.vertexColors == THREE.VertexColors) {
+        metal_mesh.material = metal_material_gray;
+      }
+      else {
+        metal_mesh.material = metal_material_color;
+      }
+      metal_mesh.material.needsUpdate = true;
+      render();
+    }
+
+</script>
+
+
+</body>
+</html>

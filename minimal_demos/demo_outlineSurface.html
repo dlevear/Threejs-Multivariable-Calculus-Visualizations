@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="mitxThreeJsHelper.js"></script>
+<script src="THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2, 2, 2 );
+    scene.add( camera );
+
+    // # Actors
+    // Scene: saddle surface with thick outline and x,y,z axes
+    var saddleFunction = function (a, b, target) {
+        var x = 2*(a-.5);
+        var y = 2*(b-.5);
+        var z = x*x-y*y;
+
+        target.set(x,y,z);
+
+        return new THREE.Vector3(x, y, z); 
+    }
+    var saddleGeometry = new THREE.ParametricGeometry(saddleFunction, 32, 32);
+    var material = new THREE.MeshPhongMaterial( { 
+        side: THREE.DoubleSide,
+        color: color3, 
+        transparent: 0,
+        opacity: 1, 
+        shininess: 20
+    } );
+    var surfaceMesh = new THREE.Mesh( saddleGeometry, material );
+    surfaceMesh.position.set( 0, 0, 0);
+    scene.add( surfaceMesh );
+
+    // Black outline of surface 
+    // Created with MeshLine library
+    // Goal: create list of points making up the outline
+    // Two helper functions to accomplish goal:
+    function project2dLineToExplicitSurface(xMin, xMax, yMin, yMax, f, subdivisions, adjust=function(x,y,z) {return [x,y,z];}) {
+      /*
+       *  returns a sequence of points obtained by f(p.x, p.y) where p is the path from (xMin,yMin) to (xMax, yMax)
+       *  optional adjust parameter will be applied to each resulting x,y,z.
+       *  the return type is a flattened array, so every 3 elements is a new vertex
+       */
+      vertices = []
+      for (var i=0; i < subdivisions+1; i++) {
+        // the plus one is because n line segments requires n+1 points
+        x = xMin + (i*(xMax-xMin)/(subdivisions));
+        y = yMin + (i*(yMax-yMin)/(subdivisions));
+        z = f(x,y);
+        adjusted = adjust(x,y,z);
+        vertices.push(adjusted[0]);
+        vertices.push(adjusted[1]);
+        vertices.push(adjusted[2]);
+      }
+      return vertices;
+    }
+    function project2dRectangleToExplicitSurface(xMin, yMin, xMax, yMax, f, subdivisionsPerSide, adjust=function(x,y,z) {return [x,y,z];}) {
+      /* returns a sequence of points obtained by f(p.x, p.y) where p is the path around the rectangle connecting (xMin,yMin) to (xMax, yMax)
+      * optional adjust parameter will be applied to each resulting x,y,z.
+      * the return type is a flattened array, so every 3 elements is a new vertex
+      */
+      var vertices = []
+      vertices = vertices.concat(project2dLineToExplicitSurface( xMin, xMax, yMin, yMin, f, subdivisionsPerSide, adjust));
+      vertices = vertices.concat(project2dLineToExplicitSurface( xMax, xMax, yMin, yMax, f, subdivisionsPerSide, adjust));
+      vertices = vertices.concat(project2dLineToExplicitSurface( xMax, xMin, yMax, yMax, f, subdivisionsPerSide, adjust));
+      vertices = vertices.concat(project2dLineToExplicitSurface( xMin, xMin, yMax, yMin, f, subdivisionsPerSide, adjust));
+      return vertices;
+    }
+
+    // Compute points using helper function
+    var points = []; 
+    var saddleFunctionExplicit = function(x,y) {
+      return x*x-y*y;
+    }
+    // Function to pop the outline so it occludes the surface not vice-versa
+    var kickout = function(x,y,z) {
+      mult = 1.002;
+      return [mult*x,mult*y,mult*z];
+    }
+    points = project2dRectangleToExplicitSurface(-1, -1, 1, 1, saddleFunctionExplicit, 32, kickout) 
+    var line = new MeshLine();
+    line.setPoints(points);
+    var material = new MeshLineMaterial({color: new THREE.Color( 0x000000), lineWidth: 0.01 });
+    var mesh = new THREE.Mesh(line, material);
+    scene.add(mesh);
+
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+</script>
+
+
+</body>
+</html>
