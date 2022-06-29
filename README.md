@@ -6,6 +6,10 @@ They were made by Duncan Levear and Jennifer French at MIT in 2020-2022 and incl
 
 Others should feel inspired to adapt these for their own uses.
 
+# Showcase
+
+To see the visualizations, use Github Pages via [this link](https://dlevear.github.io/Threejs-Multivariable-Calculus-Visualizations/githubPages.html).
+
 # License
 
 See LICENSE file.
