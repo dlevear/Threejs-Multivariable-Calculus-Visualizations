@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2, 2, 2 );
+    scene.add( camera );
+
+    // # Actors
+    var hemisphereGeometry = new THREE.SphereGeometry(0.5, 32, 16, 0, Math.PI); 
+    const alphaTexture = texture_two_centered_boxes({outerWidth:32,outerHeight:32,outerColor:new THREE.Color('white'),innerWidth:20, innerHeight:20, innerColor:new THREE.Color('black') });
+    alphaTexture.needsUpdate = true;
+    alphaTexture.wrapS = alphaTexture.wrapT = THREE.RepeatWrapping;
+    alphaTexture.repeat.set(20, 20);
+
+    var material = new THREE.MeshPhongMaterial( { 
+        side: THREE.DoubleSide,
+        color: color3, 
+        transparent: true,
+        depthTest: true,
+        alphaMap: alphaTexture,
+        opacity: 1.0, 
+        shininess: 20
+    } );
+    var hemisphereMesh = new THREE.Mesh( hemisphereGeometry, material );
+    hemisphereMesh.position.set( 0, 0, 0);
+    scene.add( hemisphereMesh );
+
+    // Black outline of surface 
+    // Created with MeshLine library
+    // Goal: create list of points making up the outline
+    // Two helper functions to accomplish goal:
+    function parametricLineToPoints(r, tMin, tMax, subdivisions) {
+      /*
+       *  returns a sequence of points r(t) where t runs through [tMin, tMax].
+       *  r: R to THREE.Vector3 
+       *  the return type is a flattened array, so every 3 elements is a new vertex
+       */
+      const vertices = []
+      for (var i=0; i < subdivisions+1; i++) {
+        // the plus one is because n line segments requires n+1 points
+        const t = tMin + (i*(tMax-tMin)/subdivisions);
+        const point = r(t);
+        vertices.push(point.x);
+        vertices.push(point.y);
+        vertices.push(point.z);
+      }
+      return vertices;
+    }
+
+    // Compute points using helper function
+    // Function to pop the outline so it occludes the surface not vice-versa
+    function cubic_along_hemisphere(t) {
+      const ret = new THREE.Vector3();
+      ret.x = t/2;
+      ret.y = t*t*t;
+      const s = 0.25 - ret.x*ret.x - ret.y*ret.y;
+      ret.z = 0
+      if (s > 0) {
+        ret.z = Math.sqrt(s); 
+      }
+      ret.multiplyScalar(1.01);
+      return ret;
+    }
+    function cubic_xy_plane(t) {
+      const ret = new THREE.Vector3();
+      ret.x = t/2;
+      ret.y = t*t*t;
+      ret.z = 0.01
+      return ret;
+    }
+    const points = parametricLineToPoints(cubic_xy_plane, -1, 1, 100); 
+    var line = new MeshLine();
+    line.setPoints(points);
+    var material = new MeshLineMaterial({color: new THREE.Color( 0xf00000), lineWidth: 0.02 });
+    var mesh = new THREE.Mesh(line, material);
+    //scene.add(mesh);
+
+    // Add shaded volume between curve and hemisphere
+    const save_original_position = function(g) {
+      console.log(g);
+      g.setAttribute(
+        'original_position',
+        new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').array), 3, true)
+      )
+    };
+    const apply_map_to_positions = function(f, g) {
+      // f(x,y,z) is a vector3
+      const orig_position = g.getAttribute('original_position').array;
+      const positions = g.getAttribute('position').array;
+      for (let i=0; i < positions.length; i+=3) {
+        t = f(orig_position[i], orig_position[i+1],orig_position[i+2]);
+        positions[i+0] = t.x;
+        positions[i+1] = t.y;
+        positions[i+2] = t.z;
+      }
+      g.attributes.position.needsUpdate = true; 
+
+    };
+    const snowVolumeGeometry = new THREE.BoxGeometry(1, 1, 1, 64, 64, 64);
+    save_original_position(snowVolumeGeometry);
+    function box_to_under_hemisphere(x, y, z) {
+      // set x,y to curve position plus or minus rotated unit tangent vector
+      // use x as t-parameter along curve, y as the plus or minus amount
+      ret = new THREE.Vector3();
+      const t = x*2;
+      const prevPos = cubic_xy_plane(t-0.01);
+      const pos = cubic_xy_plane(t);
+      const posxy = new THREE.Vector2(pos.x, pos.y);
+      const unitTangent = pos.sub(prevPos).normalize(); 
+      const rotUnitTangent = new THREE.Vector2(-unitTangent.y, unitTangent.x);
+      rotUnitTangent.multiplyScalar(y/20);
+      const retxy = posxy.add(rotUnitTangent);
+      ret.x = retxy.x;
+      ret.y = retxy.y;
+
+      // set z to 0 to hemisphere
+      const s = 1/4 - ret.x*ret.x - ret.y*ret.y;
+      ret.z = 0;
+      if (s > 0) {
+        ret.z = (z+0.5)*(Math.sqrt(s));
+      }
+      return ret;
+    }
+    apply_map_to_positions(box_to_under_hemisphere, snowVolumeGeometry);
+    snowVolumeGeometry.computeVertexNormals();
+    const snowVolumeMaterial = new THREE.MeshPhongMaterial( {color: new THREE.Color('#f00000'), side:THREE.DoubleSide, shininess: 20} );
+    const snowVolumeMesh = new THREE.Mesh(snowVolumeGeometry, snowVolumeMaterial);
+    scene.add(snowVolumeMesh);
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+    autoRotate_until_clicked(controls, render);
+</script>
+
+
+</body>
+</html>

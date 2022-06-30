@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2, 2, 2 );
+    scene.add( camera );
+
+    // # Actors
+    var hemisphereGeometry = new THREE.SphereGeometry(0.5, 32, 16, 0, Math.PI); 
+    var material = new THREE.MeshPhongMaterial( { 
+        side: THREE.DoubleSide,
+        color: color3, 
+        transparent: true,
+        depthTest: false,
+        opacity: 0.5, 
+        shininess: 20
+    } );
+    var hemisphereMesh = new THREE.Mesh( hemisphereGeometry, material );
+    hemisphereMesh.position.set( 0, 0, 0);
+    scene.add( hemisphereMesh );
+
+    function parametricLineToPoints(r, tMin, tMax, subdivisions) {
+      /*
+       *  returns a sequence of points r(t) where t runs through [tMin, tMax].
+       *  r: R to THREE.Vector3 
+       *  the return type is a flattened array, so every 3 elements is a new vertex
+       */
+      const vertices = []
+      for (var i=0; i < subdivisions+1; i++) {
+        // the plus one is because n line segments requires n+1 points
+        const t = tMin + (i*(tMax-tMin)/subdivisions);
+        const point = r(t);
+        vertices.push(point.x);
+        vertices.push(point.y);
+        vertices.push(point.z);
+      }
+      return vertices;
+    }
+
+    function cubic_along_hemisphere(t) {
+      const ret = new THREE.Vector3();
+      ret.x = t/2;
+      ret.y = t*t*t;
+      const s = 0.25 - ret.x*ret.x - ret.y*ret.y;
+      ret.z = 0
+      if (s > 0) {
+        ret.z = Math.sqrt(s); 
+      }
+      ret.multiplyScalar(1.01);
+      return ret;
+    }
+    function cubic_xy_plane(t) {
+      const ret = new THREE.Vector3();
+      ret.x = t/2;
+      ret.y = t*t*t;
+      ret.z = 0.01
+      return ret;
+    }
+    const points = parametricLineToPoints(cubic_along_hemisphere, -1, 1, 100); 
+    var line = new MeshLine();
+    line.setPoints(points);
+    var material = new MeshLineMaterial({color: new THREE.Color( 0xf00000), lineWidth: 0.02 });
+    var mesh = new THREE.Mesh(line, material);
+    scene.add(mesh);
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+    autoRotate_until_clicked(controls, render);
+</script>
+
+
+</body>
+</html>

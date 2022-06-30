@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2.85, -1.72, 0.796); 
+    scene.add( camera );
+
+    // # Actors
+    // Saddle graph with square wireframe
+    // Curves through saddle and in xy plane
+    // Gradient field in xy plane
+
+    // Saddle with square wireframe
+    var saddleFunction = function (a, b, target) {
+        var x = 2*(a-.5);
+        var y = 2*(b-.5);
+        var z = (1/2)*(x*x-y*y+1);
+
+        target.set(x,y,z);
+
+        return new THREE.Vector3(x, y, z); 
+    }
+    var saddleGeometry = new THREE.ParametricGeometry(saddleFunction, 32, 32);
+
+    const squareTexture = texture_two_centered_boxes({
+      outerColor: new THREE.Color('gray')
+    });
+    squareTexture.wrapS = squareTexture.wrapT = THREE.RepeatWrapping;
+    squareTexture.repeat.set(20,20);
+    squareTexture.needsUpdate = true;
+    const material = new THREE.MeshPhongMaterial( { 
+        side: THREE.DoubleSide,
+        color: color2,
+        transparent: 1,
+        shininess: 20,
+        map: squareTexture,
+    } );
+
+    var surfaceMesh = new THREE.Mesh( saddleGeometry, material );
+    surfaceMesh.position.set( 0, 0, 0);
+    scene.add( surfaceMesh );
+
+
+    // Curves through saddle and in xy plane
+
+    const curveBuffer = 0.02; // space between curve and surface
+    var path = new MeshLine();
+    var points = [];
+    for (let i=0; i < 100; i++) {
+      let t = i/100;
+      let y = 1.5*t-0.75; 
+      let x = 1/(1+20*y*y)/1.5;
+      let z = saddleFunction(x/2+0.5,y/2+0.5, new THREE.Vector3(0,0,0)).z; 
+      points.push(x);
+      points.push(y);
+      points.push(z+curveBuffer);
+    }
+    path.setPoints(points);
+    var lineMaterial = new MeshLineMaterial({color: 'black', lineWidth: 0.01});
+    var mesh = new THREE.Mesh(path, lineMaterial);
+    scene.add(mesh); // curve slightly above surface
+
+    var mesh2 = mesh.clone();
+    mesh2.translateZ(-2*curveBuffer);
+    scene.add(mesh2); // curve slightly below surface
+
+    var meshSquashed = mesh.clone();
+    meshSquashed.scale.z = 0.00; 
+    scene.add(meshSquashed); // curve thorugh xy plane 
+
+    // Add arrowtips to curves
+    // Get arrow direction
+    let lastPt = new THREE.Vector3(
+      points[points.length - 3],
+      points[points.length - 2],
+      points[points.length - 1],
+    );
+    let secondLastPt = new THREE.Vector3(
+      points[points.length - 3 - 3],
+      points[points.length - 3 - 2],
+      points[points.length - 3 - 1],
+    );
+    lastArrow = lastPt.clone();
+    lastArrow.subVectors(lastPt, secondLastPt);
+
+    // Make arrow short length 
+    lastArrow.normalize();
+    lastArrow.multiplyScalar(0.1);
+
+    // Draw arrows
+    // Arrow just above surface:
+    scene.add(drawVector(
+      lastArrow,
+      {
+        origin: lastPt,
+        headHeight: 0.05,
+        thickness: 0.005,
+      }
+    ));
+
+    // Arrow just below surface:
+    lastPt.z -= 2*curveBuffer;
+    scene.add(drawVector(
+      lastArrow,
+      {
+        origin: lastPt,
+        headHeight: 0.05,
+        thickness: 0.005,
+      }
+    ));
+
+    // Arrow in xy plane:
+    lastPt.z = 0;
+    lastArrow.z = 0;
+    scene.add(drawVector(
+      lastArrow,
+      {
+        origin: lastPt,
+        headHeight: 0.05,
+        thickness: 0.005,
+      }
+    ));
+
+    // Vector field
+    const maxLength = (new THREE.Vector2(1/10,1/10,0)).length();
+    for (let u=0; u < 20; u++) {
+      for (let v=0; v < 20; v++) {
+        let x = -1+u/10;
+        let y = -1+v/10;
+        const vec = new THREE.Vector3(
+          2*x/20,
+          -2*y/20,
+          0
+        );
+        const vecNormalized = vec.clone();
+        vecNormalized.normalize().multiplyScalar(0.1);
+        let arrowColorVector = new THREE.Vector3();
+        new THREE.Color(color3).getHSL(arrowColorVector);
+        let arrowColor = new THREE.Color().setHSL(
+          arrowColorVector.h,
+          arrowColorVector.s,
+          vec.length()/maxLength, 
+        );
+        scene.add(
+          drawVector( 
+            vec,
+            {
+              color: arrowColor, 
+              origin: new THREE.Vector3(x, y, 0), 
+              thickness: 0.003,
+              headHeight:vec.length()*0.25,
+            },
+          )
+        );
+      }
+    }
+
+    // Curve labels
+    function prop_along_curve(pos) {
+      const pt = new THREE.Vector3(
+        points[Math.round(points.length/3*pos)*3-3],
+        points[Math.round(points.length/3*pos)*3-2],
+        points[Math.round(points.length/3*pos)*3-1],
+      );
+      return pt;
+    }
+    let labelPt = prop_along_curve(0.25); // proportion along curve where to put label
+    labelPt.z += 0.08;
+
+    // Label tilde{C} above surface
+    addLabel('\u0108', labelPt.x, labelPt.y, labelPt.z, 'black', 'monospace', 0.5);
+
+    // Label C in xy plane
+    labelPt.x -= 0.08;
+    labelPt.z = 0;
+    addLabel('C', labelPt.x, labelPt.y, labelPt.z, 'black', 'monospace', 0.5);
+
+    // Triangle and unit tangent vector with several labels
+
+    // Helper points along curve
+    const trianglePt1 = prop_along_curve(0.35); // early point on curve
+    trianglePt1.z -= 2*curveBuffer; // (curve below surface)
+    const trianglePt2 = prop_along_curve(0.45); // late point on curve
+    trianglePt2.z -= 2*curveBuffer; // (curve below surface)
+    const trianglePt2Dropped = trianglePt2.clone(); // just below late point on curve
+    trianglePt2Dropped.z = trianglePt1.z;
+
+    // Draw unit tangent vector with label
+    const tangentVector = trianglePt2.clone();
+    tangentVector.subVectors(trianglePt2, trianglePt1);
+    // it's not actually a tangent vector
+    // but this way it's parallel to the triangle
+    tangentVector.normalize();
+    tangentVector.multiplyScalar(0.75);
+    tangentVector.z = 0;
+    scene.add(
+      drawVector( 
+        tangentVector,
+        {
+          color: 'crimson', 
+          origin: new THREE.Vector3(trianglePt1.x, trianglePt1.y, 0),
+          thickness: 0.005,
+          headHeight:0.10,
+        },
+      )
+    );
+
+    // Label tangent vector near the end
+    const tangentVectorLabelPt = new THREE.Vector3(trianglePt1.x, trianglePt1.y, 0);
+    tangentVectorLabelPt.addScaledVector(tangentVector, 1.1);
+    addLabel('T', tangentVectorLabelPt.x, tangentVectorLabelPt.y, 0, 'crimson', 'monospace', 0.4);
+
+
+    // Draw the triangle
+
+    // Helper function for drawing meshLines easily
+    function quick_line_from_vectors(listVectors, {color=new THREE.Color('crimson'),material=false}={}) {
+      if (material == false) {
+        material = new MeshLineMaterial({color: color, lineWidth:0.01});
+      }
+      var points = []
+      listVectors.forEach(v => {
+        points.push(v.x);
+        points.push(v.y);
+        points.push(v.z);
+      });
+      const l0 = new MeshLine();
+      l0.setPoints(points);
+      scene.add(new THREE.Mesh( l0, material));
+    }
+
+    // Draw horizontal leg of triangle
+    quick_line_from_vectors(
+      [
+        trianglePt1,
+        trianglePt2Dropped,
+      ]
+    );
+
+    // Draw vertical leg of triangle
+    trianglePt2Dropped.z -= 0.01/2;
+    quick_line_from_vectors(
+      [
+        trianglePt2Dropped,
+        trianglePt2
+      ]
+    );
+    trianglePt2Dropped.z += 0.01/2;
+
+    // Helper points for text labels
+    const horizontalLabelPt = new THREE.Vector3(
+      (1/2)*trianglePt1.x + (1/2)*trianglePt2Dropped.x,
+      (1/2)*trianglePt1.y + (1/2)*trianglePt2Dropped.y,
+      trianglePt1.z - 0.08,
+    )
+    const verticalLabelPt = new THREE.Vector3(
+      (-0.3)*trianglePt1.x + (1.3)*trianglePt2Dropped.x,
+      (-0.3)*trianglePt1.y + (1.3)*trianglePt2Dropped.y,
+      (1/2)*trianglePt2.z + (1/2)*trianglePt2Dropped.z,
+    )
+
+    // Label horizontal leg
+    addLabel('ds', horizontalLabelPt.x, horizontalLabelPt.y, horizontalLabelPt.z, 'crimson', 'monospace', 0.4);
+    // Label vertical leg
+    addLabel('dz', verticalLabelPt.x, verticalLabelPt.y, verticalLabelPt.z, 'crimson', 'monospace', 0.4);
+
+    // Slope label
+    const slopeLabelPt = new THREE.Vector3(
+      horizontalLabelPt.x,
+      horizontalLabelPt.y,
+      horizontalLabelPt.z - 0.10,
+    )
+    // Helper function for wide label text
+    function addWideLabel( text, x, y, z, color='black', font='monospace', size=1 ) {
+        var canvas = document.createElement( 'canvas' ); 
+        canvas.width = 720;
+        canvas.height = 720;
+        var context = canvas.getContext( '2d' );
+        c = new THREE.Color(color);
+        color = c.getStyle();
+    
+        context.font = 'italic 64px Georgia';
+        context.fillStyle = color;
+        context.textAlign = 'left';
+        context.textBaseline = 'middle';
+        context.fillText( text, canvas.width/4, canvas.height/2);
+    
+        var texture = new THREE.Texture( canvas );
+        texture.needsUpdate = true;
+    
+        var sprite = new THREE.Sprite( new THREE.SpriteMaterial( { map: texture, color: 0xffffff } ) );
+        sprite.position.set( x, y, z );
+    
+        sprite.scale.set(size,size,size); 
+    
+        scene.add( sprite );
+    }
+    // Text for slope label
+    addWideLabel('slope = \u2207 f \u00b7 T', slopeLabelPt.x, slopeLabelPt.y, slopeLabelPt.z, 'crimson', 'monospace', 0.85);
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+</script>
+
+
+</body>
+</html>
