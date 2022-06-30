@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script src="threejs_overlayEvents.js"></script>
+<script src="threejs_parulaMap.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    var scene = createScene();
+    var renderer = createRenderer()
+
+    // # Initialize camera
+    var camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 2, 2, 2 );
+    scene.add( camera );
+
+    // # Actors
+    // Scene: hilly trig surface with level curves, projection of level curves, and x,y,z axes
+    var hillsFunction = function (a, b, target) {
+        var x = 1.8*(a-.5);
+        var y = 1.8*(b-.5);
+        // Note: sin(k * 2pix) has a period of k (hump every k/2)
+        var z = -1*Math.sin((10/17)*(2*Math.PI)*x)*Math.sin((10/17)*(2*Math.PI*(y-.0)));
+        target.set(x,y,z);
+
+        return new THREE.Vector3(x, y, z); 
+    }
+    var hillsGeometry = new THREE.ParametricGeometry(hillsFunction, 64, 64);
+
+    const hillsTexture = create_level_curve_texture([.2,.4,.6,.8],.01,'#FFFFFF','#000000');
+    addColorMapToGeometry(hillsGeometry, parulaColorMap);
+    const projectedPlaneTexture = create_level_curve_texture([.2,.4,.6,.8],.01,'#000000','#FFFFFF');
+    var material = new THREE.MeshPhongMaterial( { 
+        side: THREE.DoubleSide,
+        vertexColors: true,
+        transparent: 1,
+        opacity: .9, 
+        map: hillsTexture,
+        shininess: 40
+    } );
+    var projectedPlaneMaterial = new THREE.MeshBasicMaterial( { 
+        side: THREE.DoubleSide,
+        color: "#000000", 
+        alphaMap: projectedPlaneTexture,
+        transparent: 1,
+    } );
+
+    // add texture coordinates
+    add_uv_from_y_direction(hillsGeometry);
+
+    var surfaceMesh = new THREE.Mesh( hillsGeometry, material );
+    surfaceMesh.position.set( 0, 0, 0);
+    scene.add( surfaceMesh );
+
+    // create level curve "shadows" 
+    var projectedPlaneGeometry = hillsGeometry.clone();
+    projectedPlaneGeometry.scale(1,1,.01);
+    projectedPlaneGeometry.translate(0,0,-1);
+    var projectedPlaneMesh = new THREE.Mesh( projectedPlaneGeometry, projectedPlaneMaterial );
+    scene.add( projectedPlaneMesh );
+
+    // Axes
+    scene.add(makeAxes());
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color, 1 ) );
+
+    // Custom lights
+    var lights = [{"x":-5, "y":3, "z":0, "color":"#7f7f7f", "parent":"camera"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 0);
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+
+    // # Display first time
+    render();
+    controls.update();
+    autoRotate_until_clicked(controls, render);
+</script>
+
+
+</body>
+</html>
