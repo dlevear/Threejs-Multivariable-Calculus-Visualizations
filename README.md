@@ -12,7 +12,15 @@ To see the visualizations, use Github Pages via [this link](https://dlevear.gith
 
 # License
 
-See LICENSE file.
+MIT License. See LICENSE file.
+
+# Notice of Third Party Licenses
+
+This software uses third-party dependencies which are distributed according to their own license terms:
+
+* [ThreeJs](https://github.com/mrdoob/three.js/blob/dev/LICENSE). MIT License. Copyright (c) 2010-2022 three.js authors. 
+* [THREE.MeshLine](https://github.com/spite/THREE.MeshLine). MIT License. Copyright (c) 2016 Jaume Sanchez.
+* [Jquery](https://github.com/jquery/jquery). MIT License. Copyright (c) OpenJS Foundation and other contributors.
 
 # Symbolic links to helper files
 
