@@ -6,6 +6,8 @@ They were made by Duncan Levear and Jennifer French at MIT in 2020-2022 and incl
 
 Others should feel inspired to adapt these for their own uses.
 
+The `mitxThreeJsHelper.js` file does the "heavy lifting," in that it provides the helper functions that allowed us to write each visualization as a short HTML file. Thanks to helper functions, these HTML files usually do not exceed 200 lines. 
+
 # Showcase
 
 To see the visualizations, use Github Pages via [this link](https://dlevear.github.io/Threejs-Multivariable-Calculus-Visualizations/githubPages.html).
