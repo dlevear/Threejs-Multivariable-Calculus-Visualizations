@@ -15,6 +15,7 @@
 <script src="threejs_OrbitControls.js"></script>
 <script src="threejs_mitxThreeJsHelper.js"></script>
 <script src="threejs_jquery-3.6.0.min.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
 <script>
     // # Initialize scene and bounding box
     const scene = createScene();
@@ -23,7 +24,7 @@
     // # Initialize camera
     const camera = createCamera();
     camera.up.set( 0, 0, 1 );
-    camera.position.set( 3, 3, 3);
+    camera.position.set(2.83, 2.83, 1.65);
     scene.add( camera );
 
     // # Actors
@@ -31,36 +32,6 @@
 
     // Axes
     scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
-
-    //Changing graphingFunction()s requires manually changing x-y-endpoints in parametricFunction()s and box_to_volume()
-    const graphingFunction1 = function(x,y) {
-      return 1-x*x-y*y; 
-    }
-    const graphingFunction2 = function(x,y) {
-      return x*x+y*y; 
-    }
-    const parametricFunction1 = function (a, b, target) {
-        const x = (a-0.5)*2.0;
-        const y = (b-0.5)*2.0;
-        const z = graphingFunction1(x,y);
-        target.set(x,y,z);
-        return new THREE.Vector3(x, y, z); 
-    }
-    const parametricFunction2 = function (a, b, target) {
-        const x = (a-0.5)*2.0;
-        const y = (b-0.5)*2.0;
-        const z = graphingFunction2(x,y);
-        target.set(x,y,z);
-        return new THREE.Vector3(x, y, z); 
-    }
-    const surface1geometry = new THREE.ParametricGeometry(parametricFunction1, 16, 16);
-    const surface2geometry = new THREE.ParametricGeometry(parametricFunction2, 16, 16);
-    const material1 = new THREE.MeshPhongMaterial( {color: 'gray', side:THREE.DoubleSide, transparent: true, depthTest: false, opacity:0.2} );
-    const material2 = new THREE.MeshPhongMaterial( {color: 'gray', side:THREE.DoubleSide, transparent: true, depthTest: false, opacity:0.2} );
-    const mesh1 = new THREE.Mesh(surface1geometry, material1);
-    const mesh2 = new THREE.Mesh(surface2geometry, material2);
-    scene.add(mesh1);
-    scene.add(mesh2);
 
     // Helper functions for box_to_volume()
     const save_original_position = function(g) {
@@ -82,24 +53,62 @@
       g.attributes.position.needsUpdate = true; 
 
     };
-    const volumeGeometry = new THREE.BoxGeometry(1, 1, 1, 32, 32, 32);
+    const volumeGeometry = new THREE.BoxGeometry(1, 1, 1, 50, 50, 50);
     const volumeMaterial = new THREE.MeshPhongMaterial( {color: color3, side:THREE.DoubleSide} );
-    const volumeMesh = new THREE.Mesh(volumeGeometry, volumeMaterial);
+    const volumeMesh = new THREE.Mesh(volumeGeometry, volumeMaterial); 
     save_original_position(volumeGeometry);
-    const box_to_volume = function(x,y,z){
-      ret = new THREE.Vector3(0,0,0);
-      const radius = Math.sqrt(1/2);
-      ret.x = x*2*Math.sqrt(1/2); // goes from -sqrt(2) to sqrt(2)
-      const lambdaY = y+0.5; // goes from 0 to 1
-      ret.y = (Math.sqrt(radius*radius-ret.x*ret.x))*lambdaY + (-Math.sqrt(radius*radius-ret.x*ret.x))*(1-lambdaY);
-      const lambdaZ = z+0.5;
-      ret.z = graphingFunction1(ret.x,ret.y,ret.z)*lambdaZ + graphingFunction2(ret.x,ret.y,ret.z)*(1-lambdaZ); 
-      return ret;
+
+    function spherical_to_rectangular(rho, theta, phi) {
+      const r = rho*Math.sin(phi);
+      const z = rho*Math.cos(phi);
+      const x = r*Math.cos(theta);
+      const y = r*Math.sin(theta);
+      return new THREE.Vector3(x,y,z);
+    }
+
+    const box_to_volume = function(rho,theta,phi){
+      pt = {phi: 0, theta:0, rho: 0}; 
+      const interpolate = (lambda, a, b) => a*lambda + b*(1-lambda);
+      pt.phi = interpolate(phi+0.5, 0, Math.PI/4); // phi goes from 0 to pi/4
+      pt.theta = interpolate(theta+0.5, 0, 2*Math.PI); // theta goes from 0 to 2pi
+      pt.rho = interpolate(rho+0.5, 1/(Math.sqrt(2)*Math.cos(pt.phi)), 1); // rho goes from sec(phi)/sqrt(2) to 1
+      return spherical_to_rectangular(pt.rho, pt.theta, pt.phi); 
     };
     apply_map_to_positions(box_to_volume, volumeGeometry);
     volumeGeometry.computeVertexNormals();
-    volumeGeometry.attributes.position.needsUpdate = true; 
+    // To avoid a seam where the surface joins itself, I manually set the normals
+    // (easy because it's a sphere of radius 1)
+    const g = volumeGeometry;
+    for (var i=0; i < g.attributes.position.array.length; i+=3) {
+      const [x, y, z] = g.attributes.position.array.slice(i,i+3);
+      var [nx, ny, nz] = g.attributes.normal.array.slice(i,i+3);
+      if (Math.abs(nx) > 0.001 || Math.abs(ny) > 0.001) {
+        g.attributes.normal.array[i] = x;
+        g.attributes.normal.array[i+1] = y;
+        g.attributes.normal.array[i+2] = z;
+      }
+    }
+    volumeMesh.scale.x = 1.01;
+    volumeMesh.scale.y = 1.01;
+    volumeMesh.scale.z = 1.01;
     scene.add(volumeMesh);
+
+    const sphere = new THREE.SphereGeometry(1, 32, 32);
+    const sphere_material = new THREE.MeshPhongMaterial({
+      color:color1
+    });
+    const sphere_mesh = new THREE.Mesh(sphere, sphere_material);
+    scene.add(sphere_mesh);
+
+    const p = new THREE.PlaneGeometry(2.2, 2.2);
+    p.translate(0,0,Math.sqrt(1/2)*1.007);
+    p_material = new THREE.MeshLambertMaterial({
+      color: color1,
+      side: THREE.DoubleSide,
+    });
+    const p_mesh = new THREE.Mesh(p, p_material);
+    scene.add(p_mesh);
+
 
     // # Lights
     // Ambient light

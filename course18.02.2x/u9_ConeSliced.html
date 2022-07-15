@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    const scene = createScene();
+    const renderer = createRenderer()
+
+    // # Initialize camera
+    const camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 3.68, 1.65, 0.62); 
+    scene.add( camera );
+
+    // # Actors
+    // Scene: surface with volume-so-far 
+
+    // Axes
+    scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
+
+    const g = new THREE.ConeGeometry(1, 1, 32, 32);
+    g.rotateX(-Math.PI/2);
+    g.translate(0, 0, 0.5);
+    const g_material = new THREE.MeshPhongMaterial({
+      color: color3,
+      transparent: true,
+      opacity:0.5
+    });
+    const g_mesh = new THREE.Mesh(g, g_material);
+    scene.add(g_mesh);
+
+    addLabel('z=ar', 0, 0.8, 0.6, color3, 'monospace', 0.5);
+
+    const p = new THREE.PlaneGeometry(2.2, 2.2);
+    p.translate(0,0,1.01);
+    p_material = new THREE.MeshPhongMaterial({
+      color: color2,
+      side: THREE.DoubleSide,
+    });
+    const p_mesh = new THREE.Mesh(p, p_material);
+    scene.add(p_mesh);
+
+    addLabel('z=b', 0, 1.0, 1.2, color2, 'monospace', 0.5);
+
+    const cyl = new THREE.CylinderGeometry(0.30, 0.30, 0.005, 32, 4);
+    cyl.rotateX(Math.PI/2);
+    cyl.translate(0,0,0.30);
+    const cyl_material = new THREE.MeshLambertMaterial({
+      color: color1
+    });
+    const cyl_mesh = new THREE.Mesh(cyl, cyl_material);
+    scene.add(cyl_mesh);
+
+    const p2 = new THREE.PlaneGeometry(2.2, 2.2);
+    p2.translate(0,0,0.30);
+    p2_material = new THREE.MeshPhongMaterial({
+      color: color1,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8
+    });
+    const p2_mesh = new THREE.Mesh(p2, p2_material);
+    scene.add(p2_mesh);
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color) );
+
+    // Custom lights
+    var lights = [{"x":1, "y":1, "z":1, "color":"#7f7f7f"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 1/2);
+    controls.update();
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+    render();
+
+</script>
+
+
+</body>
+</html>

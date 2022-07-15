@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title></title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+    body { margin: 0px; overflow: hidden; }
+</style>
+</head>
+
+<body>
+<canvas style="outline:0"></canvas>
+<script src="threejs_three.min.js"></script>
+<script src="threejs_OrbitControls.js"></script>
+<script src="threejs_mitxThreeJsHelper.js"></script>
+<script src="threejs_jquery-3.6.0.min.js"></script>
+<script src="threejs_THREE.MeshLine.js"></script>
+<script>
+    // # Initialize scene and bounding box
+    const scene = createScene();
+    const renderer = createRenderer()
+
+    // # Initialize camera
+    const camera = createCamera();
+    camera.up.set( 0, 0, 1 );
+    camera.position.set( 3.83, 0.88, 1.43); 
+    scene.add( camera );
+
+    // # Actors
+    // Scene: surface with volume-so-far 
+
+    // Axes
+    scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
+
+    const g = new THREE.ConeGeometry(1, 1, 32, 32);
+    g.rotateX(-Math.PI/2);
+    g.translate(0, 0, 0.5);
+    const g_material = new THREE.MeshPhongMaterial({
+      color: color3,
+      transparent: false,
+    });
+    const g_mesh = new THREE.Mesh(g, g_material);
+    scene.add(g_mesh);
+
+    function quick_line_from_vectors(listVectors, {color=new THREE.Color(0xf00000),material=false}={}) {
+      if (material == false) {
+        material = new MeshLineMaterial({color: color, lineWidth:0.02});
+      }
+      var points = []
+      listVectors.forEach(v => {
+        points.push(v.x);
+        points.push(v.y);
+        points.push(v.z);
+      });
+      const l0 = new MeshLine();
+      l0.setPoints(points); 
+      const mesh = new THREE.Mesh( l0, material);
+      scene.add(mesh);
+      return mesh;
+    }
+
+    // The extra points make it look better for some reason
+    const labelLines = quick_line_from_vectors([
+      new THREE.Vector3(0,0,0),
+      new THREE.Vector3(0,0.999,0),
+      new THREE.Vector3(0,1,0),
+      new THREE.Vector3(0,1,0.001),
+      new THREE.Vector3(0,1,1),
+    ])
+    labelLines.rotateZ(-Math.PI/4);
+    addLabel('1', 0.5, 0.5, 0.1, 'red', 'monospace', 0.5);
+    addLabel('1', Math.sqrt(1/2)*1.1, Math.sqrt(1/2)*1.1, 0.7,'red', 'monospace', 0.5);
+
+
+    // # Lights
+    // Ambient light
+    var ambient = {"color":"#7f7f7f"};
+    scene.add( new THREE.AmbientLight( ambient.color) );
+
+    // Custom lights
+    var lights = [{"x":1, "y":1, "z":1, "color":"#7f7f7f"}];
+    for ( var i=0 ; i < lights.length ; i++ ) {
+        var light = new THREE.DirectionalLight( lights[i].color, 1 );
+        light.position.set( lights[i].x, lights[i].y, lights[i].z );
+        if ( lights[i].parent === 'camera' ) {
+            light.target.position.set(0, 0, 0);
+            scene.add( light.target );
+            camera.add( light );
+        } else scene.add( light );
+    }
+
+    // # Event listeners
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.target.set(0, 0, 1/2);
+    controls.update();
+    function render() {
+        renderer.render( scene, camera );
+    }
+    controls.addEventListener( 'change', function() { render(); } );
+
+    setBoundingBox({"x":-2.0, "y":-2.0, "z":-2.0}, {"x":2.0, "y":2.0, "z":2.0});
+    window.addEventListener( 'resize', function() {
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        updateCameraAspect( camera, window.innerWidth / window.innerHeight );
+        render();
+    } );
+    render();
+    autoRotate_until_clicked(controls, render);
+
+</script>
+
+
+</body>
+</html>

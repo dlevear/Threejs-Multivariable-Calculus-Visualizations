@@ -32,36 +32,6 @@
     // Axes
     scene.add(makeAxes({xMax:1.5, yMax:1.5, zMax:1.5}));
 
-    //Changing graphingFunction()s requires manually changing x-y-endpoints in parametricFunction()s and box_to_volume()
-    const graphingFunction1 = function(x,y) {
-      return 1-x*x-y*y; 
-    }
-    const graphingFunction2 = function(x,y) {
-      return x*x+y*y; 
-    }
-    const parametricFunction1 = function (a, b, target) {
-        const x = (a-0.5)*2.0;
-        const y = (b-0.5)*2.0;
-        const z = graphingFunction1(x,y);
-        target.set(x,y,z);
-        return new THREE.Vector3(x, y, z); 
-    }
-    const parametricFunction2 = function (a, b, target) {
-        const x = (a-0.5)*2.0;
-        const y = (b-0.5)*2.0;
-        const z = graphingFunction2(x,y);
-        target.set(x,y,z);
-        return new THREE.Vector3(x, y, z); 
-    }
-    const surface1geometry = new THREE.ParametricGeometry(parametricFunction1, 16, 16);
-    const surface2geometry = new THREE.ParametricGeometry(parametricFunction2, 16, 16);
-    const material1 = new THREE.MeshPhongMaterial( {color: 'gray', side:THREE.DoubleSide, transparent: true, depthTest: false, opacity:0.2} );
-    const material2 = new THREE.MeshPhongMaterial( {color: 'gray', side:THREE.DoubleSide, transparent: true, depthTest: false, opacity:0.2} );
-    const mesh1 = new THREE.Mesh(surface1geometry, material1);
-    const mesh2 = new THREE.Mesh(surface2geometry, material2);
-    scene.add(mesh1);
-    scene.add(mesh2);
-
     // Helper functions for box_to_volume()
     const save_original_position = function(g) {
       g.setAttribute(
@@ -86,20 +56,34 @@
     const volumeMaterial = new THREE.MeshPhongMaterial( {color: color3, side:THREE.DoubleSide} );
     const volumeMesh = new THREE.Mesh(volumeGeometry, volumeMaterial);
     save_original_position(volumeGeometry);
-    const box_to_volume = function(x,y,z){
-      ret = new THREE.Vector3(0,0,0);
-      const radius = Math.sqrt(1/2);
-      ret.x = x*2*Math.sqrt(1/2); // goes from -sqrt(2) to sqrt(2)
-      const lambdaY = y+0.5; // goes from 0 to 1
-      ret.y = (Math.sqrt(radius*radius-ret.x*ret.x))*lambdaY + (-Math.sqrt(radius*radius-ret.x*ret.x))*(1-lambdaY);
-      const lambdaZ = z+0.5;
-      ret.z = graphingFunction1(ret.x,ret.y,ret.z)*lambdaZ + graphingFunction2(ret.x,ret.y,ret.z)*(1-lambdaZ); 
-      return ret;
+
+    function cylindrical_to_rectangular(r, theta, z) {
+      const x = r*Math.cos(theta);
+      const y = r*Math.sin(theta);
+      return new THREE.Vector3(x,y,z);
+    }
+
+    const box_to_volume = function(r,theta,z){
+      pt = {r: 0, theta:0, z: 0}; 
+      const lambdaR = r+0.5;
+      // small trick to hide seam, make r go down slightly with theta
+      pt.r = lambdaR*(0.25) + (1-lambdaR)*(0.5); // r goes from 0.25 to 0.5
+      pt.theta = (theta+0.5)*Math.PI*2; // theta goes from 0 to 2pi
+      pt.z = (z+0.5); // z goes from 0 to 1
+      return cylindrical_to_rectangular(pt.r, pt.theta, pt.z); 
     };
     apply_map_to_positions(box_to_volume, volumeGeometry);
     volumeGeometry.computeVertexNormals();
+    volumeGeometry.computeFaceNormals();
     volumeGeometry.attributes.position.needsUpdate = true; 
     scene.add(volumeMesh);
+    // for some reason volumeMesh has a visible seam
+    // trick to hide it, just add a proper cylinderGeometry around the outside
+    const cyl = new THREE.CylinderGeometry(0.505, 0.505, 1, 32, 32, true);
+    cyl.rotateX(Math.PI/2);
+    cyl.translate(0, 0, 0.5);
+    const cyl_mesh = new THREE.Mesh(cyl, volumeMaterial);
+    scene.add(cyl_mesh);
 
     // # Lights
     // Ambient light
